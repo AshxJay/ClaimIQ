@@ -12,6 +12,7 @@
   --bg-elevated: #FFFFFF;
   --brand-blue: #3B82F6;
   --brand-teal: #14B8A6;
+  /* These MUST stay in sync with tailwind.config.ts text tokens */
   --text-primary: #0F172A;
   --text-secondary: #334155;
   --text-muted: #64748B;
@@ -28,13 +29,27 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* Force all text to be solid and visible by default */
+    color: #0F172A;
+    -webkit-text-fill-color: initial;
   }
 
   body {
     background-color: var(--bg-deep);
-    color: var(--text-primary);
+    color: #0F172A;
+    -webkit-text-fill-color: #0F172A;
     min-height: 100vh;
     overflow-x: hidden;
+  }
+
+  /* Guarantee all text elements render with solid colour */
+  h1, h2, h3, h4, h5, h6 {
+    color: #0F172A;
+    -webkit-text-fill-color: #0F172A;
+  }
+
+  p, span, li, label, input, textarea, button, a {
+    -webkit-text-fill-color: inherit;
   }
 
   /* Scrollbar styling */
@@ -52,7 +67,7 @@
   /* Selection */
   ::selection {
     background: rgba(59, 130, 246, 0.3);
-    color: var(--text-primary);
+    color: #0F172A;
   }
 }
 
@@ -87,12 +102,14 @@
     border: 1px solid rgba(0, 0, 0, 0.06);
   }
 
-  /* Text gradient */
+  /* Text gradient — only use on decorative headings, never on body copy */
   .text-gradient {
     background: linear-gradient(135deg, #3B82F6, #14B8A6);
     -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
     background-clip: text;
+    -webkit-text-fill-color: transparent;
+    /* Fallback so text is never invisible if gradient fails */
+    color: #3B82F6;
   }
 
   /* Primary button shimmer */

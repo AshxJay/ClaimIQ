@@ -5,7 +5,6 @@ import { TopBar } from './TopBar'
 import { ModalProvider } from '@/components/ui/Modal'
 import { NotificationPanel } from '@/components/features/notifications/NotificationPanel'
 import { useUIStore } from '@/store/uiStore'
-import { InjectedTestRunner } from '@/components/InjectedTestRunner'
 import { useAuthStore } from '@/store/authStore'
 
 const pageVariants = {
@@ -21,7 +20,6 @@ export function AppShell() {
   return (
     <ModalProvider>
       <div className="flex h-screen w-full bg-bg-deep overflow-hidden font-sans selection:bg-brand-blue/30 selection:text-text-primary">
-        <InjectedTestRunner />
         {/* Sidebar */}
         <Sidebar />
 

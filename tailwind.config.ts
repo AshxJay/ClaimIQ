@@ -26,9 +26,9 @@ const config: Config = {
           info: '#3B82F6',
         },
         text: {
-          primary: '#F1F5F9',
-          secondary: '#94A3B8',
-          muted: '#475569',
+          primary: '#0F172A',
+          secondary: '#334155',
+          muted: '#64748B',
         },
         border: {
           subtle: 'rgba(0,0,0,0.06)',
