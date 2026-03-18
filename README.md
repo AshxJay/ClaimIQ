@@ -1,183 +1,214 @@
-ClaimIQ — Cloud-Based Insurance Claim Management System
-A full-stack, cloud-native insurance claim management platform built on AWS. Policyholders can submit claims with supporting documents, and insurance adjusters can review, approve, or reject them through an administrative dashboard.
+# ClaimIQ — Backend API
 
-Live URLs
-ServiceURLFrontendhttp://claimiq-frontend-ash.s3-website.ap-south-1.amazonaws.comBackend APIhttp://13.235.56.205:3000Health Checkhttp://13.235.56.205:3000/health
+Node.js + Express REST API for the ClaimIQ insurance claims management platform.
 
-Note: The backend IP changes if the ECS task restarts. Run get-backend-ip.cmd to get the current IP.
+## Tech Stack
 
+| Layer | Technology |
+|---|---|
+| Runtime | Node.js 20 |
+| Framework | Express 4 |
+| Auth | aws-jwt-verify (Cognito JWT) |
+| Database | AWS DynamoDB (SDK v3 lib-dynamodb) |
+| Storage | AWS S3 (pre-signed URLs) |
+| Email | AWS SES |
+| Config | dotenv |
+| IDs | uuid v4 |
 
-Test Accounts
-RoleEmailPasswordPolicyholdertest@example.comTest@1234Adjusteradjuster@example.comTest@1234
+---
 
-Architecture
-React Frontend (S3 + CloudFront)
-        │
-        ▼
-Amazon Cognito (Authentication + JWT)
-        │
-        ▼
-Node.js / Express REST API (Docker → ECS Fargate)
-        │
-   ┌────┴────┐────────┐
-   ▼         ▼        ▼
-DynamoDB    S3      SES/SNS
-(Claims)  (Docs)  (Notifications)
-        │
-        ▼
-   CloudWatch (Logs + Monitoring)
+## Project Structure
 
-Tech Stack
-Frontend
+```
+backend/
+├── src/
+│   ├── index.js                 # Express entry point
+│   ├── middleware/
+│   │   ├── auth.js              # Cognito JWT verification → req.user
+│   │   └── roleCheck.js        # Role-based access factory
+│   ├── services/
+│   │   ├── dynamodb.js         # DynamoDB helpers (CRUD)
+│   │   ├── s3.js               # Pre-signed URL generation
+│   │   └── ses.js              # Status-update email
+│   └── routes/
+│       ├── claims.js           # POST/GET/PATCH claim routes
+│       └── documents.js        # Upload/download URL routes
+├── .env.example
+├── Dockerfile
+└── README.md
+```
 
-React 19 + TypeScript
-Vite
-Tailwind CSS
-TanStack Query (data fetching)
-Zustand (state management)
-AWS Amplify (Cognito auth)
-Axios (HTTP client)
-Framer Motion (animations)
-Recharts (charts)
+---
 
-Backend
+## API Endpoints
 
-Node.js + Express
-AWS SDK v3
-aws-jwt-verify (Cognito JWT validation)
-Docker (containerization)
+| Method | Route | Role | Description |
+|---|---|---|---|
+| `GET` | `/health` | public | Health check |
+| `POST` | `/claims` | policyholder | Submit new claim |
+| `GET` | `/claims` | both | List claims (filtered by role) |
+| `GET` | `/claims/:id` | both | Get single claim |
+| `PATCH` | `/claims/:id/status` | adjuster | Update status + notes, send email |
+| `POST` | `/claims/:id/upload-url` | policyholder | Get S3 pre-signed PUT URL |
+| `GET` | `/claims/:id/download-url?key=` | both | Get S3 pre-signed GET URL |
 
-AWS Services
-ServicePurposeAmazon CognitoUser authentication, JWT tokens, role managementAmazon ECS FargateServerless container hosting for the backendAmazon ECRDocker image registryAmazon DynamoDBNoSQL database for claim recordsAmazon S3Encrypted document storage + frontend hostingAmazon SESEmail notifications on claim status changesAmazon CloudWatchApplication logs and monitoringAmazon VPCNetwork isolation and security
+### Response Shape (all routes)
 
-Project Structure
-ClaimIQ/
-├── backend/                  # Node.js Express API
-│   ├── src/
-│   │   ├── middleware/
-│   │   │   ├── auth.js       # Cognito JWT verification
-│   │   │   └── roleCheck.js  # Role-based access control
-│   │   ├── routes/
-│   │   │   ├── claims.js     # Claims CRUD endpoints
-│   │   │   └── documents.js  # S3 pre-signed URL endpoints
-│   │   ├── services/
-│   │   │   ├── dynamodb.js   # DynamoDB operations
-│   │   │   ├── s3.js         # S3 pre-signed URLs
-│   │   │   └── ses.js        # Email notifications
-│   │   └── index.js          # Express app entry point
-│   ├── .env.example
-│   ├── Dockerfile
-│   └── package.json
-├── src/                      # React frontend
-│   ├── components/           # Reusable UI components
-│   ├── hooks/                # React Query hooks
-│   ├── lib/                  # API client, auth, utilities
-│   ├── pages/                # Route pages
-│   │   ├── auth/             # Login, MFA
-│   │   ├── policyholder/     # Claim submission, list
-│   │   └── adjuster/         # Dashboard, queue, review
-│   ├── store/                # Zustand state
-│   └── types/                # TypeScript types
-├── get-backend-ip.cmd        # Script to get current ECS IP
-└── task-definition.json      # ECS task definition
+```json
+{
+  "success": true,
+  "data": { ... },
+  "message": "Human-readable message"
+}
+```
 
-Features
-Policyholder Portal
+---
 
-Secure login via Amazon Cognito
-Submit insurance claims (auto, home, health, life, travel)
-Upload supporting documents directly to S3
-Track claim status in real time
-Receive email notifications on status changes
+## DynamoDB Setup
 
-Adjuster Dashboard
+### Table: `Claims`
 
-View all submitted claims
-Filter and search claim queue
-Review claim details and documents
-Approve, reject, or request more information
-Add internal adjuster notes
-Fraud risk scoring per claim
+| Attribute | Type | Role |
+|---|---|---|
+| `claimId` | String | Partition key |
+| `userId` | String | GSI partition key |
+| `status` | String | `submitted \| under_review \| approved \| rejected` |
+| `claimType` | String | `health \| auto \| home \| life \| travel \| other` |
+| `description` | String | Free text |
+| `documentKeys` | List<String> | S3 object keys |
+| `adjusterNotes` | String | Adjuster comments |
+| `createdAt` | String | ISO 8601 |
+| `updatedAt` | String | ISO 8601 |
 
+**GSI required:**
 
-REST API Endpoints
-MethodEndpointRoleDescriptionGET/healthPublicHealth checkPOST/claimsPolicyholderSubmit new claimGET/claimsBothList claims (scoped by role)GET/claims/:idBothGet claim detailPATCH/claims/:id/statusAdjusterUpdate claim statusPOST/claims/:id/upload-urlPolicyholderGet S3 pre-signed upload URLGET/claims/:id/download-urlBothGet S3 pre-signed download URL
+```
+Index Name : UserIdIndex
+PK         : userId (String)
+Projection : ALL
+```
 
-DynamoDB Schema
-Table: Claims
-Partition Key: claimId (String)
-GSI: userId-index on userId (String)
-FieldTypeDescriptionclaimIdStringUUID, partition keyuserIdStringCognito sub, GSI keystatusStringsubmitted / under_review / approved / rejectedclaimTypeStringauto / home / health / life / traveldescriptionStringClaim descriptiondocumentKeysListS3 object keysadjusterNotesStringInternal notescreatedAtStringISO timestampupdatedAtStringISO timestamp
+Create via AWS CLI:
+```bash
+aws dynamodb create-table \
+  --table-name Claims \
+  --attribute-definitions \
+      AttributeName=claimId,AttributeType=S \
+      AttributeName=userId,AttributeType=S \
+  --key-schema AttributeName=claimId,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --global-secondary-indexes '[
+    {
+      "IndexName": "UserIdIndex",
+      "KeySchema": [{"AttributeName":"userId","KeyType":"HASH"}],
+      "Projection": {"ProjectionType":"ALL"}
+    }
+  ]' \
+  --region ap-south-1
+```
 
-Local Development
-Prerequisites
+---
 
-Node.js 20+
-AWS CLI configured (aws configure)
-Docker Desktop
+## Running Locally
 
-Backend
-bashcd backend
+### 1. Configure mock AWS credentials
+
+```bash
+aws configure
+# AWS Access Key ID     : test
+# AWS Secret Access Key : test
+# Default region name   : ap-south-1
+# Default output format : json
+```
+
+For a fully local DynamoDB, install [DynamoDB Local](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.html) and set:
+
+```
+# In .env
+DYNAMODB_ENDPOINT=http://localhost:8000   # optional override (edit dynamodb.js to read this)
+```
+
+### 2. Create your `.env` file
+
+```bash
 cp .env.example .env
-# Fill in your AWS values in .env
+# Fill in your values
+```
+
+### 3. Install dependencies and start
+
+```bash
+cd backend
 npm install
-npm run dev
-Frontend
-bashnpm install
-# Create .env.local with your values (see .env.example)
-npm run dev
-Environment Variables
-Backend (backend/.env):
-envPORT=3000
-AWS_REGION=ap-south-1
-COGNITO_USER_POOL_ID=your_pool_id
-COGNITO_CLIENT_ID=your_client_id
-DYNAMODB_TABLE_NAME=Claims
-S3_BUCKET_NAME=your_bucket_name
-SES_SENDER_EMAIL=your_verified_email
-Frontend (.env.local):
-envVITE_API_BASE_URL=http://localhost:3000
-VITE_MOCK=false
-VITE_COGNITO_USER_POOL_ID=your_pool_id
-VITE_COGNITO_CLIENT_ID=your_client_id
-VITE_AWS_REGION=ap-south-1
+npm run dev     # uses node --watch (no nodemon needed)
+# or
+npm start
+```
 
-Deployment
-Backend (ECS Fargate)
-bash# Build and push Docker image
-aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 927046305762.dkr.ecr.ap-south-1.amazonaws.com
+### 4. Test the health endpoint
+
+```bash
+curl http://localhost:3000/health
+# {"success":true,"data":{"status":"ok","timestamp":"..."},"message":"ClaimIQ API is running"}
+```
+
+### 5. Call a protected endpoint (requires Cognito JWT)
+
+```bash
+TOKEN="eyJ..."    # Cognito access token from frontend
+
+# List claims (adjuster sees all)
+curl -H "Authorization: Bearer $TOKEN" http://localhost:3000/claims
+
+# Submit a claim (policyholder)
+curl -X POST http://localhost:3000/claims \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"claimType":"health","description":"Hospital visit on 2026-03-01"}'
+
+# Get upload URL
+curl -X POST http://localhost:3000/claims/<claimId>/upload-url \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"filename":"invoice.pdf"}'
+
+# Adjuster: update status
+curl -X PATCH http://localhost:3000/claims/<claimId>/status \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"status":"approved","adjusterNotes":"All documents verified."}'
+```
+
+---
+
+## Docker
+
+```bash
+# Build image
 docker build -t claimiq-backend ./backend
-docker tag claimiq-backend:latest 927046305762.dkr.ecr.ap-south-1.amazonaws.com/claimiq-backend:latest
-docker push 927046305762.dkr.ecr.ap-south-1.amazonaws.com/claimiq-backend:latest
 
-# Deploy to ECS
-aws ecs update-service --cluster claimiq-cluster --service claimiq-backend-service --force-new-deployment --region ap-south-1
-Frontend (S3)
-bashnpm run build
-aws s3 sync dist/ s3://claimiq-frontend-ash --region ap-south-1
-Get Current Backend IP
-bash# Windows
-get-backend-ip.cmd
+# Run (pass env vars)
+docker run -p 3000:3000 \
+  -e AWS_REGION=ap-south-1 \
+  -e COGNITO_USER_POOL_ID=ap-south-1_XXXX \
+  -e COGNITO_CLIENT_ID=XXXX \
+  -e DYNAMODB_TABLE_NAME=Claims \
+  -e S3_BUCKET_NAME=claimiq-documents \
+  -e SES_SENDER_EMAIL=no-reply@yourdomain.com \
+  claimiq-backend
+```
 
-Cost Management
-Stop ECS when not in use to avoid charges:
-bash# Stop
-aws ecs update-service --cluster claimiq-cluster --service claimiq-backend-service --desired-count 0 --region ap-south-1
+---
 
-# Start
-aws ecs update-service --cluster claimiq-cluster --service claimiq-backend-service --desired-count 1 --region ap-south-1
+## Environment Variables
 
-AWS Infrastructure Summary
-ResourceNameECS Clusterclaimiq-clusterECS Serviceclaimiq-backend-serviceECR Repositoryclaimiq-backendDynamoDB TableClaimsS3 (Documents)claimiq-documents-ashS3 (Frontend)claimiq-frontend-ashCognito User Poolap-south-1_GDEQG1DlbCloudWatch Log Group/ecs/claimiq-backendRegionap-south-1 (Mumbai)
-
-Academic Context
-This project was built as part of a cloud computing assignment demonstrating:
-
-Cloud-native application architecture
-Containerization with Docker
-Serverless container deployment (ECS Fargate)
-AWS managed services integration
-Role-based access control
-Secure document storage
-Real-time notifications
-Application monitoring
+| Variable | Required | Description |
+|---|---|---|
+| `PORT` | No (default 3000) | Server port |
+| `AWS_REGION` | Yes | AWS region (e.g. `ap-south-1`) |
+| `COGNITO_USER_POOL_ID` | Yes | Cognito User Pool ID |
+| `COGNITO_CLIENT_ID` | Yes | Cognito App Client ID |
+| `DYNAMODB_TABLE_NAME` | Yes | DynamoDB table name |
+| `S3_BUCKET_NAME` | Yes | S3 bucket for documents |
+| `SES_SENDER_EMAIL` | Yes | Verified SES sender address |
+| `CORS_ORIGIN` | No (default `*`) | Allowed frontend origin |
