@@ -17,21 +17,22 @@ interface SubmitClaimPayload {
 
 export function useSubmitClaim() {
   const queryClient = useQueryClient()
-
   return useMutation({
     mutationFn: async (payload: SubmitClaimPayload) => {
-      const response = await post<Claim>('/claims', payload)
+      const response = await post<Claim>('/claims', {
+        claimType: payload.type,
+        description: payload.description,
+        documentKeys: payload.documentIds ?? [],
+      })
       return response.data
     },
     onSuccess: (newClaim) => {
-      // Optimistic: invalidate claims list
       queryClient.invalidateQueries({ queryKey: ['claims'] })
       queryClient.invalidateQueries({ queryKey: ['analytics'] })
       queryClient.setQueryData(['claim', newClaim.id], newClaim)
       toast.success('Claim submitted successfully', {
         description: `Claim #${newClaim.claimNumber} has been created.`,
       })
-      // Clear draft
       localStorage.removeItem('claimiq-draft')
     },
     onError: (error) => {
@@ -43,7 +44,6 @@ export function useSubmitClaim() {
   })
 }
 
-// Draft auto-save utility
 export function saveDraft(draft: ClaimDraft): void {
   localStorage.setItem(
     'claimiq-draft',

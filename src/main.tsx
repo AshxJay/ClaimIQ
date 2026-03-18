@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
+import '@/lib/cognito'
 
 async function enableMocking() {
   if (import.meta.env.VITE_MOCK !== 'true') return

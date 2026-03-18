@@ -174,7 +174,7 @@ export default function AdjusterDashboard() {
                       <p className="text-sm text-text-secondary truncate">{claim.title}</p>
                       <p className="text-xs text-text-muted mt-0.5">{formatCurrency(claim.claimedAmount)}</p>
                     </div>
-                    <PriorityBadge priority={claim.priority} />
+                    <PriorityBadge priority={claim.priority ?? 'low'} />
                   </div>
                 ))}
                 {!queue?.data?.length && <p className="text-sm text-text-muted text-center py-4">No pending claims</p>}
